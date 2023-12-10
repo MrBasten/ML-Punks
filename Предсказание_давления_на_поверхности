@@ -1,0 +1,168 @@
+# Импорт библиотек
+
+import pandas as pd
+import numpy as np
+import tensorflow
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras import models, layers
+
+## Вариант 5
+
+import os
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
+from tensorflow.keras import models, layers, callbacks
+from tensorflow.keras.applications import ResNet50
+from tensorflow.keras.layers import BatchNormalization
+import tensorflow as tf
+import matplotlib.pyplot as plt
+
+def load_data(file_path):
+    df = pd.read_csv(file_path)
+
+    if df.empty:
+        raise ValueError("Empty dataframe")
+
+    required_columns = ['X', 'Y', 'Z', 'flowVelocity', 'PressureValue']
+
+    if not set(required_columns).issubset(df.columns):
+        raise ValueError(f"Missing required columns: {', '.join(required_columns)}")
+
+    Xtrain = df[['X', 'Y', 'Z', 'flowVelocity']].astype(int).values
+    Ytrain = df['PressureValue'].astype(int).values
+
+    return Xtrain, Ytrain
+
+def normalize_data(Xtrain):
+    mean = np.mean(Xtrain, axis=0)
+    std = np.std(Xtrain, axis=0)
+    Xtrain_normalized = (Xtrain - mean) / std
+    return Xtrain_normalized, mean, std
+
+def build_model():
+    model = models.Sequential([
+        layers.Dense(1024, input_dim=4, activation='relu'),
+        layers.Dense(2048, activation='relu'),
+        layers.Dropout(0.2),
+        layers.Dense(512, activation='relu'),
+        layers.Dropout(0.2),
+        layers.Dense(256, activation='relu'),
+        layers.Dense(128, activation='relu'),
+        layers.Dropout(0.2),
+        layers.Dense(64, activation='relu'),
+        layers.Dense(32, activation='relu'),
+        layers.Dropout(0.1),
+        layers.Dense(16, activation='relu'),
+        layers.Dense(8, activation='relu'),
+        layers.Dense(4, activation='relu'),
+        layers.Dense(1, activation='linear')
+    ])
+
+    model.compile(loss='mean_squared_error', optimizer='adam')
+
+    return model
+
+def train_model(model, Xtrain, Ytrain, epochs=5, test_size=0.25, batch_size=1024):
+    x_train, x_test, y_train, y_test = train_test_split(Xtrain, Ytrain, test_size=test_size)
+
+    history = model.fit(x_train, y_train, batch_size=batch_size, epochs=epochs, validation_data=(x_test, y_test), verbose=1, shuffle=True)
+
+    return model, history
+
+def evaluate_predictions(predictions, actual_values):
+    mse = mean_squared_error(actual_values, predictions)
+    print("MSE of the neural network:", mse)
+
+def plot_history(history):
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('Model Loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Epoch')
+    plt.legend(['Train', 'Validation'], loc='upper right')
+    plt.show()
+
+def evaluate_model(model, X, Y):
+    predictions = model.predict(X)
+    mse = mean_squared_error(Y, predictions)
+    print("MSE of the neural network on new data:", mse)
+
+def save_weights(model, file_path):
+    model.save_weights(file_path)
+
+def load_weights(model, file_path):
+    model.load_weights(file_path)
+
+def summarize_results(results):
+    mean = np.mean(results)
+    std = np.std(results)
+    print("Mean:", mean)
+    print("Standard Deviation:", std)
+
+def main():
+    file_path = os.path.join('dataLuna_2V_true.csv')
+
+    try:
+        Xtrain, Ytrain = load_data(file_path)
+
+        # Normalize input data
+        Xtrain_normalized, mean, std = normalize_data(Xtrain)
+
+        # Split data into train and test sets
+        x_train, x_test, y_train, y_test = train_test_split(Xtrain_normalized, Ytrain, test_size=0.25, random_state=42)
+
+        # Build model
+        model = build_model()
+        # Train model
+        model, history = train_model(model, x_train, y_train, epochs=10, test_size=0.25, batch_size=1024)
+
+        # Evaluate model on train set
+        predictions = model.predict(x_test)
+        evaluate_predictions(predictions, y_test)
+
+        # Plot training history
+        plot_history(history)
+
+        # Save model weights
+        save_weights(model, 'model_weights.h5')
+
+        # Load model weights
+        model.load_weights('model_weights.h5')
+
+        # Evaluate model on new data
+        evaluate_model(model, x_test, y_test)
+
+        # Summarize model results
+        summarize_results(predictions)
+
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+
+    except ValueError as e:
+        print(f"Error: {str(e)}")
+
+if __name__ == '__main__':
+    main()
+
+
+import pickle
+
+def load_model(file_path):
+    with open(file_path, 'rb') as f:
+        model = pickle.load(f)
+    return model
+
+# Загрузка модели
+loaded_model = load_model('model.pkl')
+
+# Save predictions and actual values as numpy arrays
+np.savetxt('predictions.txt', predictions)
+np.savetxt('actual_values.txt', y_test)
+
+# Save model history as numpy array
+np.savetxt('loss_history.txt', history.history['loss'])
+np.savetxt('val_loss_history.txt', history.history['val_loss'])
