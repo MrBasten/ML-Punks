@@ -1,1 +1,6 @@
-
+pandas = 1.5.3
+numpy = 1.23.5
+tensorflow = 2.14.0
+sklearn = 1.2.2
+matplotlib = 3.7.1
+keras = 2.14.0
